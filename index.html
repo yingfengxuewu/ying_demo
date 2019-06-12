@@ -1,0 +1,357 @@
+<!DOCTYPE HTML>
+<html onselectstart="return false" ondragstart="return false" oncontextmenu="return false">
+    <head>
+        <meta charset="UTF-8">
+        <title>Title</title>
+        <meta name="keywords" content="关键词">
+        <meta name="description" content="描述">
+        <meta name="author" content="潭州教育-阿飞老师">
+        <style>
+            body{font-family: "Microsoft YaHei",serif;}
+            body,dl,dd,p,h1,h2,h3,h4,h5,h6{margin:0;}
+            ol,ul,li{margin:0;padding:0;list-style:none;}
+            img{border:none;}
+
+            body{
+                background-color: #222;
+                overflow: hidden;
+            }
+
+            #wrap{
+                position: relative;
+                width: 512px;
+                height: 768px;
+                margin: 10px auto;
+                background: url("img/bg_1.jpg") 0 0;
+            }
+            #wrap.active{
+                animation: bgMove 30s linear infinite;
+            }
+            @keyframes bgMove {
+                0% {background-position:0 0;}
+                100% {background-position:0 768px;}
+            }
+            #diff{
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }
+            #diff h1{
+                padding-top: 100px;
+                color: #fff;
+                text-align: center;
+            }
+            #diff ul{
+                margin-top: 200px;
+            }
+            #diff ul>li{
+                width: 200px;
+                height: 35px;
+                margin: 40px auto;
+                background-color: #fff;
+                text-align: center;
+                font-size: 16px;
+                font-weight: bold;
+                line-height: 35px;
+                cursor: pointer;
+            }
+            #diff ul>li:hover{
+                background-color: pink;
+                color: #fff;
+            }
+            #diff ul>li.l4{
+                color: #f00;
+            }
+            #content{
+                display: none;
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }
+            #content .plane,#content .bullet,#content .enemy,#content .boom{
+                position: absolute;
+                opacity : 1;
+            }
+            #content .boom.enemy{
+                animation: fadeOut 0.5s 1;
+            }
+            @keyframes fadeOut {
+                0%{opacity:1}
+                100%{opacity:0}
+            }
+            #content .score{
+                position: absolute;
+                top: 20px;
+                left: 0;
+                text-indent: 20px;
+                font-size:14px;
+                font-weight: bolder;
+                color: #fff;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="wrap">
+
+            <div id="diff">
+                <h1 class="title">飞机大战</h1>
+                <ul>
+                    <li>简单</li>
+                    <li>中等</li>
+                    <li>困难</li>
+                    <li class="l4">变态模式</li>
+                </ul>
+            </div>
+            <div id="content">
+                <span class="score">0000000</span>
+            </div>
+
+
+        </div>
+        
+        <script>
+
+            //飞机大战模块
+            {
+                //变量
+                let arrBg = ["img/bg_1.jpg", "img/bg_2.jpg", "img/bg_3.jpg","img/bg_4.jpg"],
+                    oWrap = document.getElementById("wrap"),
+                    oContent = document.getElementById("content"),
+                    oD = document.getElementById("diff"),
+                    aDiff = document.querySelectorAll("#diff ul li"),
+                    oScore = oContent.getElementsByClassName("score")[0],
+                    length =  aDiff.length,
+                    biuTimer,
+                    enemyTimer,
+                    score = 0
+                ;
+
+                //抽象画图片的生成
+                class CreateImage{
+                    constructor(info){
+                        this.src = info.src;
+                        this.width = info.width;
+                        this.height = info.height;
+                        this.className = info.className;
+                    }
+                }
+
+                //diff选择关卡事件的添加
+                for(let i=0;i<length;i++){
+                    aDiff[i].onclick = function (ev) {
+                        //针对于现有DOM的操作
+                        oD.style.display = "none";
+                        oContent.style.display = "block";
+                        oWrap.style.backgroundImage = `url(${arrBg[i]})`;
+                        oWrap.classList.add("active");
+
+                        //游戏开始函数
+                        start({
+                            x : ev.clientX,
+                            y : ev.clientY,
+                            index : i
+                        });
+                    };
+                }
+
+                //开始游戏
+                function start(options){
+                    enemy(options , plane(options));
+                }
+
+                //我军战机 + 子弹
+                function plane(options){
+                    let oPlane = Object.assign(new Image(),new CreateImage({
+                        src : "img/plane_1.png",
+                        className : "plane",
+                        width : 61,
+                        height : 47
+                    }));
+                    oPlane.HP = 5;
+                    oPlane.style.left = options.x-oWrap.offsetLeft-oPlane.width/2 + 'px';
+                    oPlane.style.top = options.y-oWrap.offsetTop-oPlane.height/2 + 'px';
+                    oContent.appendChild(oPlane);
+
+                    //document的移动事件 + 飞机边界限制
+                    let [minLeft,minTop,maxLeft,maxTop]=[
+                        -oPlane.width/2,
+                        0,
+                        oContent.offsetWidth - oPlane.width/2,
+                        oContent.offsetHeight - oPlane.height/2
+                    ];
+                    document.onmousemove = function (ev) {
+                        let left = ev.clientX-oWrap.offsetLeft-oPlane.width/2;
+                        let top = ev.clientY-oWrap.offsetTop-oPlane.height/2;
+                        left = Math.max(left , minLeft);
+                        left = Math.min(left , maxLeft);
+                        top = Math.max(top , minTop);
+                        top = Math.min(top , maxTop);
+                        oPlane.style.left = left + 'px';
+                        oPlane.style.top = top + 'px';
+                    };
+
+                    //生成子弹
+                    biuTimer = setInterval( ()=>{
+                        let oBiu = Object.assign(new Image(),new CreateImage({
+                            src : "img/fire.png",
+                            className : "bullet",
+                            width : 25,
+                            height : 35
+                        }));
+                        oBiu.style.left = oPlane.offsetLeft + oPlane.width/2 - oBiu.width/2 + 'px';
+                        oBiu.style.top = oPlane.offsetTop + 'px';
+                        oContent.appendChild(oBiu);
+
+                        (function m(){
+                            if(!oBiu.parentNode)return;
+                            let top = oBiu.offsetTop - 20;
+                            oBiu.style.top = top + 'px';
+                            if( top > -oBiu.height ){
+                                requestAnimationFrame(m);
+                            }else{
+                                oContent.removeChild(oBiu);
+                            }
+                        })();
+
+                    },[100,150,150,20][options.index]); // ****** 子弹生成速度
+                    return oPlane;
+                }
+
+                //敌军战机
+                function enemy(options,oPlane){
+                    let numE = 1;
+                    enemyTimer = setInterval( ()=>{
+                        numE ++;
+                        let ifBig = !(numE % 20);
+                        let oEnemy = Object.assign(new Image() , new CreateImage({
+                            src : ifBig?"img/enemy_big.png":"img/enemy_small.png",
+                            width : ifBig?130:54,
+                            height : ifBig?100:40,
+                            className : 'enemy'
+                        }));
+                        let minLeft = -oEnemy.width/2;
+                        let maxTop = oContent.offsetHeight;
+                        oEnemy.HP = ifBig?15:1;
+                        oEnemy.score = ifBig?200:10;
+                        oEnemy.style.left = Math.round(Math.random()*oContent.offsetWidth + minLeft) + "px";
+                        oEnemy.style.top = -oEnemy.height + 'px';
+                        oContent.appendChild(oEnemy);
+
+                        let randomSpeed = Math.floor(Math.random()*7)+2;
+                        (function m(){
+                            if(!oEnemy.parentNode)return;
+                            let top = oEnemy.offsetTop + randomSpeed;
+                            oEnemy.style.top = top + 'px';
+                            if( top < maxTop ){
+                                requestAnimationFrame(m);
+                            }else{
+                                oContent.removeChild(oEnemy);
+                            }
+
+                            //敌军做碰撞检测
+                            (function(){
+                                if(!oEnemy.parentNode)return;
+                                //和子弹的碰撞检测
+                                let allBiu = oContent.getElementsByClassName("bullet");
+                                for(let oBiu of allBiu){
+                                    if( pz(oBiu , oEnemy) ){
+                                       oContent.removeChild(oBiu); //子弹移除
+                                       oEnemy.HP --;
+                                       if( oEnemy.HP <= 0 ){
+                                           addScore(oEnemy.score);//积分
+                                           replaceBoom(oEnemy); //爆炸特效
+                                           oContent.removeChild(oEnemy); //敌军的移除
+                                           return;
+                                       }
+                                    }
+                                }
+                                //和我军的碰撞检测
+                                if( pz(oPlane , oEnemy) ){
+                                    oEnemy.HP -= 10;
+                                    oPlane.HP -= 1;
+                                    if( oEnemy.HP <= 0 ){
+                                        addScore(oEnemy.score);//积分
+                                        replaceBoom(oEnemy); //爆炸特效
+                                        oContent.removeChild(oEnemy); //敌军的移除
+                                    }
+                                    if( oPlane.HP <= 0 ){
+                                        if( oPlane.parentNode ){
+                                            replaceBoom(oPlane); //爆炸特效
+                                            oContent.removeChild(oPlane); //我军的移除
+                                            clearInterval(biuTimer);//停止生成子弹
+                                            clearInterval(enemyTimer);//停止生成敌军
+                                            setTimeout(GameOver , 2000);//2s之后 游戏结束
+                                        }
+                                    }
+                                }
+
+                            }());
+
+                        })();
+
+                    },[500 , 300 , 150 , 20][options.index]);
+                }
+
+                //积分函数
+                function addScore(s){
+                    score += s;
+                    oScore.innerHTML = (""+score).padStart(7,"0");
+                }
+
+                //碰撞检测 返回布尔值  true撞上了 false没撞上
+                function pz(obj1 , obj2){
+                    let T1 = obj1.offsetTop,
+                        B1 = T1 + obj1.offsetHeight,
+                        L1 = obj1.offsetLeft,
+                        R1 = L1 + obj1.offsetWidth;
+                    let T2 = obj2.offsetTop,
+                        B2 = T2 + obj2.offsetHeight,
+                        L2 = obj2.offsetLeft,
+                        R2 = L2 + obj2.offsetWidth;
+                    return !(B2 < T1 || R2 < L1 || T2 > B1 || L2 > R1);
+                }
+
+                //爆炸图片的生成
+                function replaceBoom(dom){
+                    let ifEnemy = /enemy/.test(dom.src);
+                    let boom = Object.assign(new Image(),new CreateImage({
+                        src : ifEnemy?"img/boom_small.png":"img/boom_big.png",
+                        className : ifEnemy?"boom enemy":"boom",
+                        width : dom.width,
+                        height : dom.height
+                    }));
+                    boom.style.left = dom.offsetLeft + 'px';
+                    boom.style.top = dom.offsetTop + 'px';
+                    oContent.appendChild(boom);
+                    ifEnemy && setTimeout(()=>{
+                        oContent.removeChild(boom);
+                    },500);
+                }
+
+                //游戏结束
+                function GameOver (){
+                    alert( "游戏结束！" );
+                }
+            }
+
+        </script>
+    </body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
